@@ -4,8 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short URLs</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Short Urls</h1>
+    <header><h1>s.hgg.es: Short URL Generator</h1></header>
+    <div class="wrap">
+        <p id="result"></p>
+        <form id="shortform">
+            <input type="text" placeholder="URL" id="url">
+            <input type="text" placeholder="Slug (optional)" id="slug">
+            <input type="submit" value="Create URL" id="submitbtn">
+        </form>
+    </div>
+    <script>
+        (function() {
+            const result = document.getElementById("result")
+
+            const form = document.getElementById("shortform")
+            const urlinput = document.getElementById("url")
+            const sluginput = document.getElementById("slug")
+
+            form.addEventListener('submit', async event => {
+                event.preventDefault()
+                
+                const body = { url: urlinput.value }
+                if (sluginput.value.length > 0)
+                    body.id = sluginput.value
+
+                console.log("Body: ", body)
+                const response = await fetch('/url', {
+                    method: 'POST',
+                    body: JSON.stringify(body),
+                    headers: { 'Content-Type': 'application/json' }
+                })
+
+                const data = await response.json()
+
+                if (response.status === 200) {
+                    const url = `${window.location.protocol}//${window.location.host}/${data.id}`
+                    result.innerHTML = `<a target="_blank" href="${url}">${url}</a>`
+                } else {
+                    console.error(data)
+                    result.innerText = data.error
+                }
+            })
+        })()
+    </script>
 </body>
 </html>

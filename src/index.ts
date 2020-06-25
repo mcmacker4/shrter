@@ -33,10 +33,12 @@ async function main() {
     router.get('/:id', async ctx => {
         const { id } = ctx.params
         try {
-            const url = await urls.findOne({ id })
-            if (url) {
+            const result = await urls.findOne({ id })
+            log("Mongo Result: %O", result)
+            if (result) {
                 // ctx.status = 301
-                ctx.redirect(url.url)
+                log("Redirection URL: %s", result.url)
+                ctx.redirect(result.url)
             } else {
                 ctx.status = 404
             }
@@ -48,14 +50,16 @@ async function main() {
 
     const schema = object().shape({
         id: string().default(() => nanoid(6)).trim().min(1),
-        url: string().url()
+        url: string().url().required()
     })
     router.post('/url', async ctx => {
         try {
+            log("Incoming body: %O", ctx.request.body)
             const body = await schema.validate(ctx.request.body, { stripUnknown: true })
+            log("Validated body: %O", body)
             const result = await urls.insert(body)
             log("Mongo Result: %O", result)
-            ctx.body = result
+            ctx.body = { id: result.id }
         } catch (error) {
             ctx.status = error.status || 500
             ctx.body = { error: error.message, stack: process.env.NODE_ENV === 'production' ? "" : error.stack }
