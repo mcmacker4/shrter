@@ -14,7 +14,7 @@ main().catch(error => console.error(error))
 async function main() {
 
     // Database connection
-    const mongoHost = process.env.MONGODB_HOST || 'localhost/shrter'
+    const mongoHost = process.env.MONGODB_URI || 'localhost/shrter'
     const db = await monk(mongoHost)
     const urls = db.get('urls')
 
