@@ -67,11 +67,15 @@
                     const url = `${window.location.protocol}//${window.location.host}/${data.id}`
                     result.innerText = url
 
+                    hint.style.display = "block"
+
                     urlinput.value = ""
                     sluginput.value = ""
                 } else {
                     console.error(data)
                     result.innerText = data.error
+
+                    hint.style.display = "none"
                 }
 
             })
