@@ -17,7 +17,6 @@ async function main() {
 
     // Database connection
     const mongoHost = process.env.MONGODB_URI || 'localhost/shrter'
-    log('MongoDB Host: %s', mongoHost)
     const db = monk(mongoHost)
     const urls = db.get('urls')
     urls.createIndex('id')
@@ -34,10 +33,8 @@ async function main() {
         const { id } = ctx.params
         try {
             const result = await urls.findOne({ id })
-            log("Mongo Result: %O", result)
             if (result) {
                 // ctx.status = 301
-                log("Redirection URL: %s", result.url)
                 ctx.redirect(result.url)
             } else {
                 ctx.status = 404
@@ -54,11 +51,8 @@ async function main() {
     })
     router.post('/url', async ctx => {
         try {
-            log("Incoming body: %O", ctx.request.body)
             const body = await schema.validate(ctx.request.body, { stripUnknown: true })
-            log("Validated body: %O", body)
             const result = await urls.insert(body)
-            log("Mongo Result: %O", result)
             ctx.body = { id: result.id }
         } catch (error) {
             ctx.status = error.status || 500

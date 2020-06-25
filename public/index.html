@@ -9,7 +9,7 @@
 <body>
     <header><h1>s.hgg.es: Short URL Generator</h1></header>
     <div class="wrap">
-        <p id="result"></p>
+        <div id="result"></div>
         <form id="shortform">
             <input type="text" placeholder="URL" id="url">
             <input type="text" placeholder="Slug (optional)" id="slug">
@@ -39,6 +39,7 @@
                 })
 
                 const data = await response.json()
+                result.style.display = 'block'
 
                 if (response.status === 200) {
                     const url = `${window.location.protocol}//${window.location.host}/${data.id}`
@@ -47,6 +48,7 @@
                     console.error(data)
                     result.innerText = data.error
                 }
+
             })
         })()
     </script>

@@ -19,7 +19,21 @@ header > h1 {
 }
 
 #result {
+    display: none;
+
+    margin-top: 20px;
+    margin-bottom: 20px;
+
+    padding: 20px;
+
+    border-radius: 4px;
+    background-color: #c2c2c2;
+
     text-align: center;
+}
+
+#result > a {
+    text-decoration: none;
 }
 
 /* Style inputs */
