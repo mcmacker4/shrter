@@ -44,6 +44,9 @@
                 if (response.status === 200) {
                     const url = `${window.location.protocol}//${window.location.host}/${data.id}`
                     result.innerHTML = `<a target="_blank" href="${url}">${url}</a>`
+
+                    urlinput.value = ""
+                    sluginput.value = ""
                 } else {
                     console.error(data)
                     result.innerText = data.error

@@ -12,8 +12,8 @@ main().catch(error => console.error(error))
 
 async function main() {
 
-    const log = debug('shrter')
-    const loghttp = log.extend('http')
+    const log = debug('shrter:app')
+    const loghttp = debug('shrter:http')
 
     // Database connection
     const mongoHost = process.env.MONGODB_URI || 'localhost/shrter'
