@@ -8,20 +8,19 @@ import monk from 'monk'
 import { object, string } from 'yup'
 import { nanoid } from 'nanoid'
 
-
 main().catch(error => console.error(error))
 
 async function main() {
 
+    const log = debug('shrter')
+    const loghttp = log.extend('http')
+
     // Database connection
     const mongoHost = process.env.MONGODB_URI || 'localhost/shrter'
-    const db = await monk(mongoHost)
+    log('MongoDB Host: %s', mongoHost)
+    const db = monk(mongoHost)
     const urls = db.get('urls')
-
     urls.createIndex('id')
-
-    const log = debug('shrter')
-    const loghttp = debug('shrter:http')
 
     const app = new Koa()
 
@@ -33,13 +32,17 @@ async function main() {
 
     router.get('/:id', async ctx => {
         const { id } = ctx.params
-
         try {
             const url = await urls.findOne({ id })
-            ctx.status = 301
-            ctx.redirect(url.url)
+            if (url) {
+                // ctx.status = 301
+                ctx.redirect(url.url)
+            } else {
+                ctx.status = 404
+            }
         } catch (error) {
             log(error.message)
+            ctx.status = 500
         }
     })
 
@@ -50,10 +53,12 @@ async function main() {
     router.post('/url', async ctx => {
         try {
             const body = await schema.validate(ctx.request.body, { stripUnknown: true })
-            await urls.insert(body)
+            const result = await urls.insert(body)
+            log("Mongo Result: %O", result)
+            ctx.body = result
         } catch (error) {
             ctx.status = error.status || 500
-            ctx.body = { error: error.message, stack: error.stack }
+            ctx.body = { error: error.message, stack: process.env.NODE_ENV === 'production' ? "" : error.stack }
         }
     })
 
@@ -61,6 +66,6 @@ async function main() {
     app.use(router.middleware())
 
     const port = process.env.PORT || 8080
-    app.listen(port, () => log("Listening..."))
+    app.listen(port, () => log("Listening on port %d", port))
 
 }
