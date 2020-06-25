@@ -19,7 +19,8 @@ async function main() {
     const mongoHost = process.env.MONGODB_URI || 'localhost/shrter'
     const db = monk(mongoHost)
     const urls = db.get('urls')
-    urls.createIndex('id')
+
+    urls.createIndex('id', { unique: true })
 
     const app = new Koa()
 
@@ -46,12 +47,15 @@ async function main() {
     })
 
     const schema = object().shape({
-        id: string().default(() => nanoid(6)).trim().min(1),
+        id: string().default(() => nanoid(6)).trim().min(1).max(16),
         url: string().url().required()
     })
     router.post('/url', async ctx => {
         try {
             const body = await schema.validate(ctx.request.body, { stripUnknown: true })
+            if (await urls.findOne({ id: body.id })) {
+                throw new Error("Slug is already in use.")
+            }
             const result = await urls.insert(body)
             ctx.body = { id: result.id }
         } catch (error) {
