@@ -47,7 +47,7 @@ async function main() {
     })
 
     const schema = object().shape({
-        id: string().default(() => nanoid(6)).trim().min(1).max(16),
+        id: string().default(() => nanoid(6)).trim().max(16).matches(/^[\w\-]+$/i),
         url: string().url().required()
     })
     router.post('/url', async ctx => {
