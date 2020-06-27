@@ -14,7 +14,7 @@
     "koa-logger": "^3.2.1",
     "koa-router": "^9.0.1",
     "koa-static": "^5.0.0",
-    "monk": "^7.3.0",
+    "mongodb": "^3.5.9",
     "nanoid": "^3.1.10",
     "yup": "^0.29.1"
   },
@@ -25,6 +25,7 @@
     "@types/koa-logger": "^3.1.1",
     "@types/koa-router": "^7.4.1",
     "@types/koa-static": "^4.0.1",
+    "@types/mongodb": "^3.5.25",
     "@types/nanoid": "^2.1.0",
     "@types/yup": "^0.29.3",
     "ts-node": "^8.10.2",

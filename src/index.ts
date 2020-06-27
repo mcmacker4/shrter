@@ -4,7 +4,7 @@ import Router, { url } from 'koa-router'
 import logger from 'koa-logger'
 import serve from 'koa-static'
 import debug from 'debug'
-import monk from 'monk'
+import { MongoClient } from 'mongodb'
 import { object, string } from 'yup'
 import { nanoid } from 'nanoid'
 
@@ -12,14 +12,21 @@ main().catch(error => console.error(error))
 
 async function main() {
 
+    interface URLEntry {
+        id: string
+        url: string
+    }
+
     const log = debug('shrter:app')
     const loghttp = debug('shrter:http')
 
     // Database connection
-    const mongoHost = process.env.MONGODB_URI || 'localhost/shrter'
-    const db = monk(mongoHost)
-    const urls = db.get('urls')
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost/shrter'
+    const mongoClient = new MongoClient(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
 
+    await mongoClient.connect()
+    const urls = mongoClient.db().collection<URLEntry>('urls')
+    
     urls.createIndex('id', { unique: true })
 
     const app = new Koa()
@@ -56,8 +63,10 @@ async function main() {
             if (await urls.findOne({ id: body.id })) {
                 throw new Error("Slug is already in use.")
             }
-            const result = await urls.insert(body)
-            ctx.body = { id: result.id }
+            const result = await urls.insertOne(body)
+            ctx.body = {
+                id: result.ops[0].id
+            }
         } catch (error) {
             ctx.status = error.status || 500
             ctx.body = { error: error.message, stack: process.env.NODE_ENV === 'production' ? "" : error.stack }
