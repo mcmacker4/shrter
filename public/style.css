@@ -3,10 +3,8 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-}
 
-body {
-    font: sans-serif;
+    font-family: Tahoma, Geneva, sans-serif;
 }
 
 header > h1 {
