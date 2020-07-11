@@ -66,10 +66,10 @@
                     headers: { 'Content-Type': 'application/json' }
                 })
 
-                const data = await response.json()
-                resultBox.style.display = 'block'
+                if (response.ok) {
+                    const data = await response.json()
+                    resultBox.style.display = 'block'
 
-                if (response.status === 200) {
                     const url = `${window.location.protocol}//${window.location.host}/${data.id}`
                     result.innerText = url
 
@@ -78,9 +78,9 @@
                     urlinput.value = ""
                     sluginput.value = ""
                 } else {
-                    console.error(data)
-                    result.innerText = data.error
-
+                    const data = await response.text()
+                    resultBox.style.display = 'block'
+                    result.innerText = data
                     hint.style.display = "none"
                 }
 

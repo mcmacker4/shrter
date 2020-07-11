@@ -1,11 +1,12 @@
-import Koa from 'koa'
+import Koa, { Context } from 'koa'
 import bodyparser from 'koa-bodyparser'
 import Router, { url } from 'koa-router'
-import logger from 'koa-logger'
 import serve from 'koa-static'
+import ratelimit from 'koa-ratelimit'
+import cors from '@koa/cors'
 import debug from 'debug'
 import { MongoClient } from 'mongodb'
-import { object, string } from 'yup'
+import { object, string, ValidationError } from 'yup'
 import { nanoid } from 'nanoid'
 
 main().catch(error => console.error(error))
@@ -30,9 +31,22 @@ async function main() {
     urls.createIndex('id', { unique: true })
 
     const app = new Koa()
+    app.proxy = true
+
+    app.use(async (ctx, next) => {
+        const start = Date.now()
+        try {
+            await next()
+        } catch (e) {
+            loghttp(`${ctx.ip} - ${ctx.method} ${ctx.path} - ${e.status || 500} ${Date.now() - start}ms`)
+            throw e
+        }
+        loghttp(`${ctx.ip} - ${ctx.method} ${ctx.path} - ${ctx.status} ${Date.now() - start}ms`)
+    })
+
+    app.use(cors())
 
     app.use(bodyparser({ enableTypes: ['json'] }))
-    app.use(logger({ transporter: (str) => loghttp(str) }))
     app.use(serve('public'))
 
     const router = new Router()
@@ -42,7 +56,7 @@ async function main() {
         try {
             const result = await urls.findOne({ id })
             if (result) {
-                // ctx.status = 301
+                ctx.status = 301
                 ctx.redirect(result.url)
             } else {
                 ctx.status = 404
@@ -53,7 +67,15 @@ async function main() {
         }
     })
 
-    const schema = object().shape({
+    const ratelimitDb = new Map()
+    router.use('/url', ratelimit({
+        driver: 'memory',
+        db: ratelimitDb,
+        max: 30, // 1 every 2 minutes
+        disableHeader: true
+    }))
+
+    const schema = object<URLEntry>().shape({
         id: string().default(() => nanoid(6)).trim().max(16).matches(/^[\w\-]+$/i),
         url: string().url().required()
     })
@@ -61,15 +83,15 @@ async function main() {
         try {
             const body = await schema.validate(ctx.request.body, { stripUnknown: true })
             if (await urls.findOne({ id: body.id })) {
-                throw new Error("Slug is already in use.")
+                ctx.throw(400, "Slug is already in use.")
             }
             const result = await urls.insertOne(body)
-            ctx.body = {
-                id: result.ops[0].id
-            }
-        } catch (error) {
-            ctx.status = error.status || 500
-            ctx.body = { error: error.message, stack: process.env.NODE_ENV === 'production' ? "" : error.stack }
+            ctx.body = { id: result.ops[0].id }
+        } catch (e) {
+            if (e instanceof ValidationError)
+                ctx.throw(400, e.message)
+            else
+                ctx.throw(e)
         }
     })
 
