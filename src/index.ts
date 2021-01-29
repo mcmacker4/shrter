@@ -1,22 +1,41 @@
-import Koa, { Context } from 'koa'
+import Koa from 'koa'
 import bodyparser from 'koa-bodyparser'
-import Router, { url } from 'koa-router'
+import Router from 'koa-router'
 import serve from 'koa-static'
 import ratelimit from 'koa-ratelimit'
 import cors from '@koa/cors'
+import got from 'got'
 import debug from 'debug'
 import { MongoClient } from 'mongodb'
 import { object, string, ValidationError } from 'yup'
 import { nanoid } from 'nanoid'
+import path from 'path'
+import querystring from 'querystring'
 
-main().catch(error => console.error(error))
+const captchaPath = path.resolve(__dirname, '..', 'captcha.json')
+const captchaKeys = require(captchaPath)
+
+interface URLEntry {
+    id: string
+    url: string
+}
+
+interface CaptchaResponseFail {
+    success: false
+    "error-codes": string[]
+}
+
+interface CaptchaResponseSuccess {
+    success: boolean,
+    challenge_ts: string,
+    hostname: string,
+    score: number
+    action: string
+}
+
+type CaptchaResponse = CaptchaResponseSuccess | CaptchaResponseFail
 
 async function main() {
-
-    interface URLEntry {
-        id: string
-        url: string
-    }
 
     const log = debug('shrter:app')
     const loghttp = debug('shrter:http')
@@ -75,6 +94,31 @@ async function main() {
         disableHeader: true
     }))
 
+
+    // Captcha Filter
+    router.use('/url', async (ctx, next) => {
+        const captchaToken = ctx.headers['x-captcha']
+        const captchaResponse = await got.post(
+            'https://www.google.com/recaptcha/api/siteverify',
+            {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'
+                },
+                body: querystring.stringify({
+                    secret: captchaKeys['secret'],
+                    response: captchaToken,
+                    remoteip: ctx.request.ip
+                })
+            }
+        ).json<CaptchaResponse>()
+
+        if (captchaResponse.success && captchaResponse.score >= 0.9) {
+            await next()
+        } else {
+            ctx.throw(400, "Captcha Failed.")
+        }
+    })
+
     const schema = object<URLEntry>().shape({
         id: string().default(() => nanoid(6)).trim().max(16).matches(/^[\w\-]+$/i),
         url: string().url().required()
@@ -102,3 +146,5 @@ async function main() {
     app.listen(port, () => log("Listening on port %d", port))
 
 }
+
+main().catch(error => console.error(error))
