@@ -115,6 +115,7 @@ async function main() {
         if (captchaResponse.success && captchaResponse.score >= 0.9) {
             await next()
         } else {
+            loghttp("Captcha failed: %o", captchaResponse)
             ctx.throw(400, "Captcha Failed.")
         }
     })
