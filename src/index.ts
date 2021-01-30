@@ -4,36 +4,19 @@ import Router from 'koa-router'
 import serve from 'koa-static'
 import ratelimit from 'koa-ratelimit'
 import cors from '@koa/cors'
-import got from 'got'
 import debug from 'debug'
 import { MongoClient } from 'mongodb'
 import { object, string, ValidationError } from 'yup'
 import { nanoid } from 'nanoid'
-import path from 'path'
-import querystring from 'querystring'
+import { discordAlert } from './discord'
+import {captchaFilter} from './captcha'
 
-const captchaPath = path.resolve(__dirname, '..', 'captcha.json')
-const captchaKeys = require(captchaPath)
 
-interface URLEntry {
+export interface URLEntry {
     id: string
     url: string
 }
 
-interface CaptchaResponseFail {
-    success: false
-    "error-codes": string[]
-}
-
-interface CaptchaResponseSuccess {
-    success: boolean,
-    challenge_ts: string,
-    hostname: string,
-    score: number
-    action: string
-}
-
-type CaptchaResponse = CaptchaResponseSuccess | CaptchaResponseFail
 
 async function main() {
 
@@ -94,31 +77,8 @@ async function main() {
         disableHeader: true
     }))
 
-
     // Captcha Filter
-    router.use('/url', async (ctx, next) => {
-        const captchaToken = ctx.headers['x-captcha']
-        const captchaResponse = await got.post(
-            'https://www.google.com/recaptcha/api/siteverify',
-            {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'
-                },
-                body: querystring.stringify({
-                    secret: captchaKeys['secret'],
-                    response: captchaToken,
-                    remoteip: ctx.request.ip
-                })
-            }
-        ).json<CaptchaResponse>()
-
-        if (captchaResponse.success && captchaResponse.score >= 0.9) {
-            await next()
-        } else {
-            loghttp("Captcha failed: %o", captchaResponse)
-            ctx.throw(400, "Captcha Failed.")
-        }
-    })
+    router.use('/url', captchaFilter())
 
     const schema = object<URLEntry>().shape({
         id: string().default(() => nanoid(6)).trim().max(16).matches(/^[\w\-]+$/i),
@@ -132,6 +92,9 @@ async function main() {
             }
             const result = await urls.insertOne(body)
             ctx.body = { id: result.ops[0].id }
+
+            discordAlert(body)
+
         } catch (e) {
             if (e instanceof ValidationError)
                 ctx.throw(400, e.message)
