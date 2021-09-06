@@ -1,11 +1,14 @@
 import got from 'got'
-import { options } from './options'
 import {URLEntry} from '.'
 
-const hookUrl = options.discord.url
+
+const hookUrl = process.env['DISCORD_HOOK']
 
 export async function discordAlert(url: URLEntry) {
-    
+
+    if (!hookUrl)
+        return
+
     await got.post(hookUrl, {
         json: {
             embeds: [

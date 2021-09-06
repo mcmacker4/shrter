@@ -7,7 +7,7 @@ import cors from '@koa/cors'
 import debug from 'debug'
 import {readFile} from 'fs/promises'
 import {createPool} from 'mysql2/promise'
-import Yup from 'yup'
+import {object, string, ValidationError, SchemaOf} from 'yup'
 import {nanoid} from 'nanoid'
 import {discordAlert} from './discord'
 import {captchaFilter} from './captcha'
@@ -89,9 +89,9 @@ async function main() {
     // Captcha Filter
     router.use('/url', captchaFilter())
 
-    const schema: Yup.SchemaOf<URLEntry> = Yup.object().shape({
-        id: Yup.string().default(() => nanoid(6)).trim().max(16).matches(/^[\w\-]+$/i),
-        url: Yup.string().url().required()
+    const schema: SchemaOf<URLEntry> = object().shape({
+        id: string().default(() => nanoid(6)).trim().max(16).matches(/^[\w\-]+$/i),
+        url: string().url().required()
     })
     router.post('/url', async ctx => {
         try {
@@ -105,7 +105,7 @@ async function main() {
             discordAlert(body).catch()
 
         } catch (e) {
-            if (e instanceof Yup.ValidationError)
+            if (e instanceof ValidationError)
                 ctx.throw(400, e.message)
             else
                 ctx.throw(e)

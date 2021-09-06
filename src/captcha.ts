@@ -1,8 +1,8 @@
-import { options } from './options'
 import querystring from 'querystring'
 import got from 'got'
 import {Context, Next} from 'koa'
 import debug from 'debug'
+import {readFile} from "fs/promises";
 
 interface CaptchaResponseFail {
     success: false
@@ -21,6 +21,14 @@ type CaptchaResponse = CaptchaResponseSuccess | CaptchaResponseFail
 
 const logcaptcha = debug('shrter:captcha')
 
+async function resolveCaptchaSecret(): Promise<string | undefined> {
+    if (process.env['CAPTCHA_SECRET_FILE'])
+        return (await readFile(process.env['CAPTCHA_SECRET_FILE'])).toString()
+    else if (process.env['CAPTCHA_SECRET'])
+        return process.env['CAPTCHA_SECRET']
+}
+
+
 export function captchaFilter() {
     return async (ctx: Context, next: Next) => {
         const captchaToken = ctx.headers['x-captcha']
@@ -31,7 +39,7 @@ export function captchaFilter() {
                     'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'
                 },
                 body: querystring.stringify({
-                    secret: options.captcha.secret,
+                    secret: await resolveCaptchaSecret(),
                     response: captchaToken,
                     remoteip: ctx.request.ip
                 })
