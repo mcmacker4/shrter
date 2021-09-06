@@ -5,11 +5,13 @@ import serve from 'koa-static'
 import ratelimit from 'koa-ratelimit'
 import cors from '@koa/cors'
 import debug from 'debug'
-import { MongoClient } from 'mongodb'
-import { object, string, ValidationError } from 'yup'
-import { nanoid } from 'nanoid'
-import { discordAlert } from './discord'
+import {readFile} from 'fs/promises'
+import {createPool} from 'mysql2/promise'
+import Yup from 'yup'
+import {nanoid} from 'nanoid'
+import {discordAlert} from './discord'
 import {captchaFilter} from './captcha'
+import {UrlRepository} from "./repository";
 
 
 export interface URLEntry {
@@ -17,6 +19,12 @@ export interface URLEntry {
     url: string
 }
 
+async function resolveDatabasePassword(): Promise<string | undefined> {
+    if (process.env['DB_PASSWORD_FILE'])
+        return (await readFile(process.env['DB_PASSWORD_FILE'])).toString()
+    else if (process.env['DB_PASSWORD'])
+        return process.env['DB_PASSWORD']
+}
 
 async function main() {
 
@@ -24,13 +32,14 @@ async function main() {
     const loghttp = debug('shrter:http')
 
     // Database connection
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost/shrter'
-    const mongoClient = new MongoClient(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
+    const sqlPool = createPool({
+        host: process.env['HOST'] || 'localhost',
+        database: process.env['DB_DATABASE'],
+        user: process.env['DB_USER'],
+        password: await resolveDatabasePassword()
+    })
 
-    await mongoClient.connect()
-    const urls = mongoClient.db().collection<URLEntry>('urls')
-    
-    urls.createIndex('id', { unique: true })
+    const urls = new UrlRepository(sqlPool)
 
     const app = new Koa()
     app.proxy = true
@@ -56,7 +65,7 @@ async function main() {
     router.get('/:id', async ctx => {
         const { id } = ctx.params
         try {
-            const result = await urls.findOne({ id })
+            const result = await urls.findById(id)
             if (result) {
                 ctx.status = 301
                 ctx.redirect(result.url)
@@ -80,23 +89,23 @@ async function main() {
     // Captcha Filter
     router.use('/url', captchaFilter())
 
-    const schema = object<URLEntry>().shape({
-        id: string().default(() => nanoid(6)).trim().max(16).matches(/^[\w\-]+$/i),
-        url: string().url().required()
+    const schema: Yup.SchemaOf<URLEntry> = Yup.object().shape({
+        id: Yup.string().default(() => nanoid(6)).trim().max(16).matches(/^[\w\-]+$/i),
+        url: Yup.string().url().required()
     })
     router.post('/url', async ctx => {
         try {
-            const body = await schema.validate(ctx.request.body, { stripUnknown: true })
-            if (await urls.findOne({ id: body.id })) {
+            const body: URLEntry = await schema.validate(ctx.request.body, { stripUnknown: true })
+            if (await urls.findById(body.id)) {
                 ctx.throw(400, "Slug is already in use.")
             }
-            const result = await urls.insertOne(body)
-            ctx.body = { id: result.ops[0].id }
+            await urls.save(body)
+            ctx.body = { id: body.id }
 
-            discordAlert(body)
+            discordAlert(body).catch()
 
         } catch (e) {
-            if (e instanceof ValidationError)
+            if (e instanceof Yup.ValidationError)
                 ctx.throw(400, e.message)
             else
                 ctx.throw(e)
